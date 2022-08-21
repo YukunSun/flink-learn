@@ -8,6 +8,10 @@ import org.apache.flink.api.java.operators.FlatMapOperator;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.shaded.curator4.com.google.common.collect.Lists;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
+import org.apache.flink.streaming.api.datastream.KeyedStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
 import org.junit.jupiter.api.Test;
 
@@ -35,8 +39,29 @@ class FlinkLearnApplicationTests {
         sum.print();
     }
 
+    /**
+     * 流式
+     */
     @Test
-    void streamWordCount() {
+    void streamWordCount() throws Exception {
+        StreamExecutionEnvironment environment = StreamExecutionEnvironment.getExecutionEnvironment();
+        DataStreamSource<String> stringDataStreamSource = environment.fromCollection(Lists.newArrayList("hello test", "hello world", "hi world"));
 
+        SingleOutputStreamOperator<Tuple2<String, Long>> tuple = stringDataStreamSource.flatMap((String line, Collector<Tuple2<String, Long>> out) -> {
+            String[] words = line.split(" ");
+            for (String word : words) {
+                out.collect(Tuple2.of(word, 1L));
+            }
+        }).returns(Types.TUPLE(Types.STRING, Types.LONG));
+
+        //分组
+        KeyedStream<Tuple2<String, Long>, String> tuple2StringKeyedStream = tuple.keyBy(data -> data.f0);
+
+        //求和
+        SingleOutputStreamOperator<Tuple2<String, Long>> sum = tuple2StringKeyedStream.sum(1);
+        sum.print();
+
+        //上面只是定义，还没确切执行
+        environment.execute();
     }
 }
