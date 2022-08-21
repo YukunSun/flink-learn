@@ -64,4 +64,34 @@ class FlinkLearnApplicationTests {
         //上面只是定义，还没确切执行
         environment.execute();
     }
+
+    /**
+     * 模拟从服务器获取数据
+     * <p>
+     * $ nc -lk 7777
+     *
+     * @throws Exception
+     */
+    @Test
+    void simulationStream() throws Exception {
+        StreamExecutionEnvironment environment = StreamExecutionEnvironment.getExecutionEnvironment();
+        DataStreamSource<String> stringDataStreamSource = environment.socketTextStream("192.168.1.5", 7777);
+
+        SingleOutputStreamOperator<Tuple2<String, Long>> tuple = stringDataStreamSource.flatMap((String line, Collector<Tuple2<String, Long>> out) -> {
+            String[] words = line.split(" ");
+            for (String word : words) {
+                out.collect(Tuple2.of(word, 1L));
+            }
+        }).returns(Types.TUPLE(Types.STRING, Types.LONG));
+
+        //分组
+        KeyedStream<Tuple2<String, Long>, String> tuple2StringKeyedStream = tuple.keyBy(data -> data.f0);
+
+        //求和
+        SingleOutputStreamOperator<Tuple2<String, Long>> sum = tuple2StringKeyedStream.sum(1);
+        sum.print();
+
+        //上面只是定义，还没确切执行
+        environment.execute();
+    }
 }
